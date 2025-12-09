@@ -4,10 +4,9 @@ from fastapi.middleware.cors import CORSMiddleware
 app = FastAPI()
 
 origins = [
-    "http://127.0.0.1",
-    "http://localhost",
-    "file://",
-    "*"
+    "https://mohammednouman555.github.io",
+    "https://mohammednouman555.github.io/Portfolio",
+    "https://mohammednouman555.github.io/Portfolio/"
 ]
 
 
