@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from sqlite3
 
 app = FastAPI()
 
@@ -18,6 +19,24 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
+#--------DATABASE SETUP--------
+def init_db():
+    conn = sqlite3.connect("messages.db")
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT,
+            email TEXT,
+            message TEXT
+        )
+        """
+    )
+    conn.commit
+    conn.close()
+
+# ------API
 
 @app.get("/")
 def root():
