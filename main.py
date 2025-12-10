@@ -61,3 +61,4 @@ async def contact(request: Request):
     except Exception as e:
         print("Email Error:", e)
         return {"status": "error", "message": "Failed to send message"}
+        
