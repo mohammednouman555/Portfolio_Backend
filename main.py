@@ -18,9 +18,9 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
-SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
-FROM_EMAIL = os.getenv("FROM_EMAIL")
-TO_EMAIL = os.getenv("TO_EMAIL")
+SENDGRID_API_KEY = os.environ.get("SENDGRID_API_KEY")
+TO_EMAIL = os.environ.get("TO_EMAIL")
+FROM_EMAIL = os.environ.get("FROM_EMAIL")
 
 @app.get("/")
 def root():
