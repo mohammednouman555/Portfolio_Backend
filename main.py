@@ -19,7 +19,7 @@ app.add_middleware(
 )
 
 EMAIL_ADDRESS = "mohdnouman555@gmail.com"  # Your Gmail
-EMAIL_PASSWORD = "YOUR_APP_PASSWORD_HERE"  # Replace with App Password
+EMAIL_PASSWORD = "slap tath cods yhrq"  # Replace with App Password
 
 @app.get("/")
 def root():
