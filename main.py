@@ -1,8 +1,8 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+import os
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail
 
 app = FastAPI()
 
@@ -18,12 +18,15 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
-EMAIL_ADDRESS = "mohdnouman555@gmail.com"  # Your Gmail
-EMAIL_PASSWORD = "slap tath cods yhrq"  # Replace with App Password
+SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
+TO_EMAIL = "mohdnouman555@gmail.com"
+FROM_EMAIL = "portfolio@mohammednouman555.github.io"  # Sender identity
+
 
 @app.get("/")
 def root():
     return {"message": "Backend is running successfully"}
+
 
 @app.post("/contact")
 async def contact(request: Request):
@@ -33,20 +36,24 @@ async def contact(request: Request):
     user_email = data.get("email")
     user_message = data.get("message")
 
-    # Email content
-    subject = f"Portfolio Contact from {user_name}"
-    body = f"Name: {user_name}\nEmail: {user_email}\nMessage:\n{user_message}"
+    email_subject = f"New Portfolio Message from {user_name}"
+    email_content = f"""
+    Name: {user_name}
+    Email: {user_email}
+    Message:
+    {user_message}
+    """
 
-    msg = MIMEMultipart()
-    msg["From"] = EMAIL_ADDRESS
-    msg["To"] = EMAIL_ADDRESS
-    msg["Subject"] = subject
-    msg.attach(MIMEText(body, "plain"))
+    message = Mail(
+        from_email=FROM_EMAIL,
+        to_emails=TO_EMAIL,
+        subject=email_subject,
+        plain_text_content=email_content
+    )
 
     try:
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-            server.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
-            server.send_message(msg)
+        sg = SendGridAPIClient(SENDGRID_API_KEY)
+        sg.send(message)
         return {"status": "success", "message": "Your message has been sent successfully!"}
     except Exception as e:
         print("Email Error:", e)
