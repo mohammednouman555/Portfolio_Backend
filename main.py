@@ -1,15 +1,15 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from sqlite3
+import sqlite3
 
 app = FastAPI()
 
+# ---------- CORS SETUP ----------
 origins = [
     "https://mohammednouman555.github.io",
     "https://mohammednouman555.github.io/Portfolio",
     "https://mohammednouman555.github.io/Portfolio/"
 ]
-
 
 app.add_middleware(
     CORSMiddleware,
@@ -19,7 +19,7 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
-#--------DATABASE SETUP--------
+# ---------- DATABASE SETUP ----------
 def init_db():
     conn = sqlite3.connect("messages.db")
     cursor = conn.cursor()
@@ -33,27 +33,27 @@ def init_db():
         )
         """
     )
-    conn.commit
+    conn.commit()
     conn.close()
 
-init_db() #create table automatically on startup
+init_db()  # Create table automatically on startup
 
 
 def save_message(name, email, message):
     conn = sqlite3.connect("messages.db")
     cursor = conn.cursor()
     cursor.execute(
-        "INSERT INTO messages (name, email, message) VALUES (?, ?, ?)", (name, email, message)
+        "INSERT INTO messages (name, email, message) VALUES (?, ?, ?)",
+        (name, email, message)
     )
     conn.commit()
     conn.close()
 
-# ------API---------
 
+# ---------- API ----------
 @app.get("/")
 def root():
     return {"message": "Backend is running successfully"}
-
 
 @app.post("/contact")
 async def contact(request: Request):
