@@ -1,14 +1,13 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-import sqlite3
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 app = FastAPI()
 
-# ---------- CORS SETUP ----------
 origins = [
     "https://mohammednouman555.github.io",
-    "https://mohammednouman555.github.io/Portfolio",
-    "https://mohammednouman555.github.io/Portfolio/"
 ]
 
 app.add_middleware(
@@ -19,38 +18,9 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
-# ---------- DATABASE SETUP ----------
-def init_db():
-    conn = sqlite3.connect("messages.db")
-    cursor = conn.cursor()
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS messages (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT,
-            email TEXT,
-            message TEXT
-        )
-        """
-    )
-    conn.commit()
-    conn.close()
+EMAIL_ADDRESS = "mohdnouman555@gmail.com"  # Your Gmail
+EMAIL_PASSWORD = "YOUR_APP_PASSWORD_HERE"  # Replace with App Password
 
-init_db()  # Create table automatically on startup
-
-
-def save_message(name, email, message):
-    conn = sqlite3.connect("messages.db")
-    cursor = conn.cursor()
-    cursor.execute(
-        "INSERT INTO messages (name, email, message) VALUES (?, ?, ?)",
-        (name, email, message)
-    )
-    conn.commit()
-    conn.close()
-
-
-# ---------- API ----------
 @app.get("/")
 def root():
     return {"message": "Backend is running successfully"}
@@ -58,5 +28,26 @@ def root():
 @app.post("/contact")
 async def contact(request: Request):
     data = await request.json()
-    save_message(data["name"], data["email"], data["message"])
-    return {"status": "success", "message": "Message received & stored!"}
+
+    user_name = data.get("name")
+    user_email = data.get("email")
+    user_message = data.get("message")
+
+    # Email content
+    subject = f"Portfolio Contact from {user_name}"
+    body = f"Name: {user_name}\nEmail: {user_email}\nMessage:\n{user_message}"
+
+    msg = MIMEMultipart()
+    msg["From"] = EMAIL_ADDRESS
+    msg["To"] = EMAIL_ADDRESS
+    msg["Subject"] = subject
+    msg.attach(MIMEText(body, "plain"))
+
+    try:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
+            server.send_message(msg)
+        return {"status": "success", "message": "Your message has been sent successfully!"}
+    except Exception as e:
+        print("Email Error:", e)
+        return {"status": "error", "message": "Failed to send message"}
