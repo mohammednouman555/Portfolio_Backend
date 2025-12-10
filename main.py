@@ -20,7 +20,7 @@ app.add_middleware(
 
 SENDGRID_API_KEY = os.getenv(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)
 TO_EMAIL = "mohammednouman555@gmail.com"
-FROM_EMAIL = "portfolio@mohammednouman555.github.io"  # Sender identity
+FROM_EMAIL = "mohammednouman555"  # Sender identity
 
 
 @app.get("/")
