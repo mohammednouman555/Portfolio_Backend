@@ -1,10 +1,8 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 import os
-from dotenv import load_dotenv
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
-
 
 app = FastAPI()
 
@@ -21,14 +19,12 @@ app.add_middleware(
 )
 
 SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
-TO_EMAIL = "mohammednouman555@gmail.com"
-FROM_EMAIL = "mohammednouman555@gmail.com"  # Sender identity
-
+FROM_EMAIL = os.getenv("FROM_EMAIL")
+TO_EMAIL = os.getenv("TO_EMAIL")
 
 @app.get("/")
 def root():
     return {"message": "Backend is running successfully"}
-
 
 @app.post("/contact")
 async def contact(request: Request):
@@ -40,11 +36,11 @@ async def contact(request: Request):
 
     email_subject = f"New Portfolio Message from {user_name}"
     email_content = f"""
-    Name: {user_name}
-    Email: {user_email}
-    Message:
-    {user_message}
-    """
+Name: {user_name}
+Email: {user_email}
+Message:
+{user_message}
+"""
 
     message = Mail(
         from_email=FROM_EMAIL,
@@ -60,4 +56,3 @@ async def contact(request: Request):
     except Exception as e:
         print("Email Error:", e)
         return {"status": "error", "message": "Failed to send message"}
-        
