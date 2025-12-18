@@ -27,9 +27,11 @@ app.add_middleware(
 # TO_EMAIL = os.environ.get("TO_EMAIL")
 # FROM_EMAIL = os.environ.get("FROM_EMAIL")
 
+
 @app.get("/")
 def root():
     return {"message": "Backend is running successfully"}
+
 
 @app.post("/contact")
 async def contact(request: Request):
@@ -49,6 +51,25 @@ async def contact(request: Request):
         "status": "success",
         "message": "Your message has been sent and saved successfully"
     }
+
+
+@app.get("/admin/messages")
+def get_all_messages():
+    db = SessionLocal()
+    messages = db.query(ContactMessage).all()
+    db.close()
+
+    result = []
+    for msg in messages:
+        result.append({
+            "id": msg.id,
+            "name": msg.user_name,
+            "email": msg.user_email,
+            "message": msg.user_message
+        })
+    return result
+
+
 #     email_subject = f"New Portfolio Message from {user_name}"
 #     email_content = f"""
 # Name: {user_name}
