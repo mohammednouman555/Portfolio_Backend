@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Request
+from fastapi import Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import os
 # from sendgrid import SendGridAPIClient
@@ -52,22 +53,27 @@ async def contact(request: Request):
         "message": "Your message has been sent and saved successfully"
     }
 
+ADMIN_API_KEY = os.environ.get("ADMIN_API_KEY")
+
 
 @app.get("/admin/messages")
-def get_all_messages():
+def get_all_messages(x_api_key: str = Header(None)):
+    if x_api_key != ADMIN_API_KEY:
+        raise HTTPException(status_code=401, detail="Unauthorized")
     db = SessionLocal()
     messages = db.query(ContactMessage).all()
     db.close()
 
-    result = []
-    for msg in messages:
-        result.append({
+    return [
+        {
             "id": msg.id,
             "name": msg.name,
             "email": msg.email,
             "message": msg.message
-        })
-    return result
+        }
+        for msg in messages
+    ]
+
 
 
 #     email_subject = f"New Portfolio Message from {user_name}"
