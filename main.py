@@ -29,6 +29,10 @@ app.add_middleware(
 # FROM_EMAIL = os.environ.get("FROM_EMAIL")
 
 
+ADMIN_API_KEY = os.environ.get("ADMIN_API_KEY")
+
+
+
 @app.get("/")
 def root():
     return {"message": "Backend is running successfully"}
@@ -53,7 +57,6 @@ async def contact(request: Request):
         "message": "Your message has been sent and saved successfully"
     }
 
-ADMIN_API_KEY = os.environ.get("ADMIN_API_KEY")
 
 
 @app.get("/admin/messages")
