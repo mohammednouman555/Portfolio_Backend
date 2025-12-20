@@ -60,7 +60,7 @@ async def contact(request: Request):
 
 
 @app.get("/admin/messages")
-def get_all_messages(x_api_key: str = Header(None)):
+def get_all_messages(x_api_key: str = Header(None, alias="x-api-key")):
     if x_api_key != ADMIN_API_KEY:
         raise HTTPException(status_code=401, detail="Unauthorized")
     db = SessionLocal()
