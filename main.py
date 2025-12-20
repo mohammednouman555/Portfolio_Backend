@@ -63,9 +63,9 @@ def get_all_messages():
     for msg in messages:
         result.append({
             "id": msg.id,
-            "name": msg.user_name,
-            "email": msg.user_email,
-            "message": msg.user_message
+            "name": msg.name,
+            "email": msg.email,
+            "message": msg.message
         })
     return result
 
