@@ -14,6 +14,7 @@ Base.metadata.create_all(bind=engine)
 
 origins = [
     "https://mohammednouman555.github.io",
+    "http://localhost:63342",
 ]
 
 app.add_middleware(
