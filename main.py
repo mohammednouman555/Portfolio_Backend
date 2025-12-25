@@ -81,11 +81,21 @@ def get_all_messages(x_api_key: str = Header(None, alias="x-api-key")):
 
 @app.get("/health")
 def health_check():
-    return {
-        "status": "Ok",
-        "service": "portfolio-backend",
-        "database": "connected"
-    }
+    try:
+        db = SessionLocal()
+        db.execute("SELECT 1")
+        db.close()
+        return {
+            "status": "Ok",
+            "service": "portfolio-backend",
+            "database": "connected"
+        }
+    except Exception:
+        return {
+            "status": "degraded",
+            "service": "portfolio-backend",
+            "database": "disconnected"
+        }
 
 
 # @app.get("/admin/messages")
