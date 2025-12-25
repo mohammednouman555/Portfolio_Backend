@@ -79,6 +79,15 @@ def get_all_messages(x_api_key: str = Header(None, alias="x-api-key")):
     ]
 
 
+@app.get("/health")
+def health_check():
+    return {
+        "status": "Ok",
+        "service": "portfolio-backend",
+        "database": "connected"
+    }
+
+
 # @app.get("/admin/messages")
 # def get_all_messages(x_api_key: str = Header(None, alias="x-api-key")):
 #     return {
