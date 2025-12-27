@@ -7,6 +7,7 @@ import os
 from database import engine, SessionLocal
 from models import ContactMessage
 from database import Base
+from sqlalchemy import text
 
 app = FastAPI()
 
@@ -82,19 +83,19 @@ def get_all_messages(x_api_key: str = Header(None, alias="x-api-key")):
 @app.get("/health")
 def health_check():
     try:
-        db = SessionLocal()
-        db.execute("SELECT 1")
-        db.close()
+        with engine.contact() as conn:
+            conn.execute(text("SELECT 1"))
         return {
             "status": "Ok",
             "service": "portfolio-backend",
             "database": "connected"
         }
-    except Exception:
+    except Exception as e:
         return {
             "status": "degraded",
             "service": "portfolio-backend",
-            "database": "disconnected"
+            "database": "disconnected",
+            "error": str(e)
         }
 
 
