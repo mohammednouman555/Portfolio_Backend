@@ -11,7 +11,6 @@ from sqlalchemy import text
 
 app = FastAPI()
 
-Base.metadata.create_all(bind=engine)
 
 origins = [
     "https://mohammednouman555.github.io",
@@ -83,7 +82,7 @@ def get_all_messages(x_api_key: str = Header(None, alias="x-api-key")):
 @app.get("/health")
 def health_check():
     try:
-        with engine.contact() as conn:
+        with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
         return {
             "status": "Ok",
