@@ -33,7 +33,6 @@ app.add_middleware(
 ADMIN_API_KEY = os.environ.get("ADMIN_API_KEY")
 
 
-
 @app.get("/")
 def root():
     return {"message": "Backend is running successfully"}
@@ -59,11 +58,12 @@ async def contact(request: Request):
     }
 
 
-
 @app.get("/admin/messages")
-def get_all_messages(x_api_key: str = Header(None, alias="x-api-key")):
-    if x_api_key != ADMIN_API_KEY:
-        raise HTTPException(status_code=401, detail="Unauthorized")
+def get_all_messages(request: Request, x_api_key: str = Header(None, alias="x-api-key")):
+    if request.headers.get("origin") is not None:
+        raise HTTPException(status_code=403, detail="forbidden")
+    if not x_api_key or x_api_key != ADMIN_API_KEY:
+        raise HTTPException(status_code=404, detail="Not Found")
     db = SessionLocal()
     messages = db.query(ContactMessage).all()
     db.close()
@@ -73,7 +73,9 @@ def get_all_messages(x_api_key: str = Header(None, alias="x-api-key")):
             "id": msg.id,
             "name": msg.name,
             "email": msg.email,
-            "message": msg.message
+            "message": msg.message,
+            "is_read": msg.is_read,
+            "created_at": msg.created_at
         }
         for msg in messages
     ]
@@ -96,36 +98,3 @@ def health_check():
             "database": "disconnected",
             "error": str(e)
         }
-
-
-# @app.get("/admin/messages")
-# def get_all_messages(x_api_key: str = Header(None, alias="x-api-key")):
-#     return {
-#         "received_key": x_api_key,
-#         "expected_key": ADMIN_API_KEY
-#     }
-
-
-
-#     email_subject = f"New Portfolio Message from {user_name}"
-#     email_content = f"""
-# Name: {user_name}
-# Email: {user_email}
-# Message:
-# {user_message}
-# """
-#
-#     message = Mail(
-#         from_email=FROM_EMAIL,
-#         to_emails=TO_EMAIL,
-#         subject=email_subject,
-#         plain_text_content=email_content
-#     )
-#
-#     try:
-#         sg = SendGridAPIClient(SENDGRID_API_KEY)
-#         sg.send(message)
-#         return {"status": "success", "message": "Your message has been sent successfully!"}
-#     except Exception as e:
-#         print("Email Error:", e)
-#         return {"status": "error", "message": "Failed to send message"}
