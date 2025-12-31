@@ -60,12 +60,14 @@ async def contact(request: Request):
 
 @app.get("/admin/messages")
 def get_all_messages(request: Request, x_api_key: str = Header(None, alias="x-api-key")):
-    if request.headers.get("origin") is not None:
-        raise HTTPException(status_code=403, detail="forbidden")
+    ALLOWED_ADMIN_ORIGIN = "https://mohammednouman555.github.io"
+    origin = request.headers.get("origin")
+    if origin and origin != ALLOWED_ADMIN_ORIGIN:
+        raise HTTPException(status_code=403, detail="forbidden origin")
     if not x_api_key or x_api_key != ADMIN_API_KEY:
         raise HTTPException(status_code=404, detail="Not Found")
     db = SessionLocal()
-    messages = db.query(ContactMessage).all()
+    messages = db.query(ContactMessage).order_by(ContactMessage.created_at.desc()).all()
     db.close()
 
     return [
