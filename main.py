@@ -98,3 +98,27 @@ def health_check():
             "database": "disconnected",
             "error": str(e)
         }
+
+
+@app.put("/admin/messages/{message_id}/read")
+def mark_message_as_read(message_id: int, request: Request, x_api_key: str = Header(None, alias="x-api-key")):
+    if request.headers.get("origin") is not None:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    if not x_api_key or x_api_key != ADMIN_API_KEY:
+        raise HTTPException(status_code=404, detail="Not Found")
+
+    db = SessionLocal()
+    message = db.query(ContactMessage).filter(ContactMessage.id == message_id).first()
+
+    if not message:
+        db.close()
+        raise HTTPException(status_code=404, detail="Message Not Found")
+
+    message.is_read = True
+    db.commit()
+    db.close()
+
+    return {
+        "status": "success",
+        "message": "Message marked as read"
+    }
