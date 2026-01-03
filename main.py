@@ -8,6 +8,8 @@ from database import engine, SessionLocal
 from models import ContactMessage
 from database import Base
 from sqlalchemy import text
+from fastapi import Request
+from rate_limiter import is_allowed
 
 app = FastAPI()
 
@@ -40,6 +42,9 @@ def root():
 
 @app.post("/contact")
 async def contact(request: Request):
+    client_ip = request.client.host
+    if not is_allowed(client_ip):
+        raise HTTPException(status_code=429, detail="Too many requests, Try later.")
     data = await request.json()
 
     db = SessionLocal()
