@@ -21,9 +21,13 @@ origins = [
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://mohammednouman555.github.io/Portfolio/", "http:localhost:63342"],
+    allow_origins=[
+        "https://mohammednouman555.github.io",
+        "http://localhost:5500",
+        "http://127.0.0.1:5500"
+    ],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "OPTIONS"],
     allow_headers=["*"],
 )
 
