@@ -21,10 +21,14 @@ origins = [
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=[
+        "https://mohammednouman555.github.io",
+        "http://localhost:5500",
+        "http://127.0.0.1:5500",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"]
+    allow_headers=["*"],
 )
 
 # SENDGRID_API_KEY = os.environ.get("SENDGRID_API_KEY")
@@ -42,9 +46,9 @@ def root():
 
 @app.post("/contact")
 async def contact(request: Request):
-    client_ip = request.client.host
-    if not is_allowed(client_ip):
-        raise HTTPException(status_code=429, detail="Too many requests, Try later.")
+    # client_ip = request.client.host
+    # if not is_allowed(client_ip):
+    #     raise HTTPException(status_code=429, detail="Too many requests, Try later.")
     data = await request.json()
 
     db = SessionLocal()
