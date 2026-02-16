@@ -1,23 +1,21 @@
-from fastapi import FastAPI, Request
-from fastapi import Header, HTTPException
+from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import OAuth2PasswordBearer
+from sqlalchemy import text
+from datetime import datetime, timedelta
 import os
-# from sendgrid import SendGridAPIClient
-# from sendgrid.helpers.mail import Mail
+import jwt
+
 from database import engine, SessionLocal
 from models import ContactMessage
-from database import Base
-from sqlalchemy import text
-from fastapi import Request
-from rate_limiter import is_allowed
+
+
+# ================== APP ==================
 
 app = FastAPI()
 
 
-origins = [
-    "https://mohammednouman555.github.io",
-    "http://localhost:63342",
-]
+# ================== CORS ==================
 
 app.add_middleware(
     CORSMiddleware,
@@ -30,12 +28,58 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# SENDGRID_API_KEY = os.environ.get("SENDGRID_API_KEY")
-# TO_EMAIL = os.environ.get("TO_EMAIL")
-# FROM_EMAIL = os.environ.get("FROM_EMAIL")
+
+# ================== ENV ==================
+
+ADMIN_USER = os.environ.get("ADMIN_USER")
+ADMIN_PASS = os.environ.get("ADMIN_PASS")
+SECRET_KEY = os.environ.get("SECRET_KEY", "change-this-secret")
+
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
 
-ADMIN_API_KEY = os.environ.get("ADMIN_API_KEY")
+# ================== AUTH ==================
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="admin/login")
+
+
+def create_token(data: dict):
+    to_encode = data.copy()
+
+    expire = datetime.utcnow() + timedelta(
+        minutes=ACCESS_TOKEN_EXPIRE_MINUTES
+    )
+
+    to_encode.update({"exp": expire})
+
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def verify_token(token: str = Depends(oauth2_scheme)):
+
+    try:
+        payload = jwt.decode(
+            token,
+            SECRET_KEY,
+            algorithms=[ALGORITHM]
+        )
+
+        username = payload.get("sub")
+
+        if username is None:
+            raise HTTPException(status_code=401)
+
+        return username
+
+    except:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or expired token"
+        )
+
+
+# ================== ROUTES ==================
 
 
 @app.get("/")
@@ -43,86 +87,129 @@ def root():
     return {"message": "Backend is running successfully"}
 
 
+# ------------------ CONTACT ------------------
+
 @app.post("/contact")
 async def contact(request: Request):
-    # client_ip = request.client.host
-    # if not is_allowed(client_ip):
-    #     raise HTTPException(status_code=429, detail="Too many requests, Try later.")
+
     data = await request.json()
 
     db = SessionLocal()
+
     new_message = ContactMessage(
         name=data.get("name"),
         email=data.get("email"),
         message=data.get("message")
     )
+
     db.add(new_message)
     db.commit()
     db.close()
 
     return {
         "status": "success",
-        "message": "Your message has been sent and saved successfully"
+        "message": "Your message has been sent"
     }
 
 
+# ------------------ ADMIN LOGIN ------------------
+
+@app.post("/admin/login")
+def admin_login(data: dict):
+
+    username = data.get("username")
+    password = data.get("password")
+
+    if username != ADMIN_USER or password != ADMIN_PASS:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid credentials"
+        )
+
+    token = create_token({"sub": username})
+
+    return {
+        "access_token": token,
+        "token_type": "bearer"
+    }
+
+
+# ------------------ ADMIN MESSAGES ------------------
+
 @app.get("/admin/messages")
-def get_all_messages(request: Request, x_api_key: str = Header(None, alias="x-api-key")):
-    if not x_api_key or x_api_key != ADMIN_API_KEY:
-        raise HTTPException(status_code=401, detail="Unauthorized")
+def get_messages(user: str = Depends(verify_token)):
+
     db = SessionLocal()
-    messages = db.query(ContactMessage).order_by(ContactMessage.created_at.desc()).all()
+
+    messages = db.query(ContactMessage)\
+        .order_by(ContactMessage.created_at.desc())\
+        .all()
+
     db.close()
 
     return [
         {
-            "id": msg.id,
-            "name": msg.name,
-            "email": msg.email,
-            "message": msg.message,
-            "is_read": msg.is_read,
-            "created_at": msg.created_at
+            "id": m.id,
+            "name": m.name,
+            "email": m.email,
+            "message": m.message,
+            "is_read": m.is_read,
+            "created_at": m.created_at
         }
-        for msg in messages
+        for m in messages
     ]
 
 
-@app.get("/health")
-def health_check():
-    try:
-        with engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
-        return {
-            "status": "Ok",
-            "service": "portfolio-backend",
-            "database": "connected"
-        }
-    except Exception as e:
-        return {
-            "status": "degraded",
-            "service": "portfolio-backend",
-            "database": "disconnected",
-            "error": str(e)
-        }
-
+# ------------------ MARK READ ------------------
 
 @app.put("/admin/messages/{message_id}/read")
-def mark_message_as_read(message_id: int, request: Request, x_api_key: str = Header(None, alias="x-api-key")):
-    if not x_api_key or x_api_key != ADMIN_API_KEY:
-        raise HTTPException(status_code=401, detail="Unauthorized")
+def mark_read(
+    message_id: int,
+    user: str = Depends(verify_token)
+):
 
     db = SessionLocal()
-    message = db.query(ContactMessage).filter(ContactMessage.id == message_id).first()
 
-    if not message:
+    msg = db.query(ContactMessage)\
+        .filter(ContactMessage.id == message_id)\
+        .first()
+
+    if not msg:
         db.close()
-        raise HTTPException(status_code=404, detail="Message Not Found")
+        raise HTTPException(
+            status_code=404,
+            detail="Message not found"
+        )
 
-    message.is_read = True
+    msg.is_read = True
+
     db.commit()
     db.close()
 
     return {
         "status": "success",
-        "message": "Message marked as read"
+        "message": "Marked as read"
     }
+
+
+# ------------------ HEALTH ------------------
+
+@app.get("/health")
+def health():
+
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+
+        return {
+            "status": "Ok",
+            "database": "connected"
+        }
+
+    except Exception as e:
+
+        return {
+            "status": "degraded",
+            "database": "disconnected",
+            "error": str(e)
+        }
