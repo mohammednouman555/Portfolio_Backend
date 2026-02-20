@@ -213,3 +213,32 @@ def health():
             "database": "disconnected",
             "error": str(e)
         }
+
+@app.delete("/admin/messages/{message_id}")
+def delete_message(message_id: int, request: Request):
+
+    auth = request.headers.get("Authorization")
+
+    if not auth or not auth.startswith("Bearer "):
+        raise HTTPException(status_code=401)
+
+    token = auth.replace("Bearer ", "")
+
+    expire = admin_tokens.get(token)
+
+    if not expire or expire < datetime.utcnow():
+        raise HTTPException(status_code=401)
+
+    db = SessionLocal()
+
+    msg = db.query(ContactMessage).filter(ContactMessage.id == message_id).first()
+
+    if not msg:
+        db.close()
+        raise HTTPException(status_code=404)
+
+    db.delete(msg)
+    db.commit()
+    db.close()
+
+    return {"status": "deleted"}
