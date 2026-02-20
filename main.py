@@ -5,6 +5,7 @@ from sqlalchemy import text
 from datetime import datetime, timedelta
 import os
 from jose import JWTError, jwt
+from passlib.context import CryptContext
 
 from database import engine, SessionLocal
 from models import ContactMessage
@@ -32,11 +33,20 @@ app.add_middleware(
 # ================== ENV ==================
 
 ADMIN_USER = os.environ.get("ADMIN_USER")
-ADMIN_PASS = os.environ.get("ADMIN_PASS")
+ADMIN_PASS_HASH = os.environ.get("ADMIN_PASS_HASH")
 SECRET_KEY = os.environ.get("SECRET_KEY", "change-this-secret")
 
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
+
+
+# ================== PASSWORD HASHING ==================
+
+pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
+
+
+def verify_password(plain_password: str, hashed_password: str):
+    return pwd_context.verify(plain_password, hashed_password)
 
 
 # ================== AUTH ==================
@@ -78,7 +88,6 @@ def verify_token(token: str = Depends(oauth2_scheme)):
         return username
 
     except JWTError:
-
         raise HTTPException(
             status_code=401,
             detail="Invalid or expired token"
@@ -126,12 +135,21 @@ def admin_login(data: dict):
     username = data.get("username")
     password = data.get("password")
 
-    if username != ADMIN_USER or password != ADMIN_PASS:
+    # Check username
+    if username != ADMIN_USER:
         raise HTTPException(
             status_code=401,
             detail="Invalid credentials"
         )
 
+    # Check password using hash
+    if not pwd_context.verify(password, ADMIN_PASS_HASH):
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid credentials"
+        )
+
+    # Create JWT token
     token = create_token({"sub": username})
 
     return {
@@ -237,7 +255,6 @@ def delete_message(
 def health():
 
     try:
-
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
 
@@ -247,7 +264,6 @@ def health():
         }
 
     except Exception as e:
-
         return {
             "status": "degraded",
             "database": "disconnected",
