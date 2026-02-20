@@ -4,8 +4,8 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy import text
 from datetime import datetime, timedelta
 import os
-import jwt
 from jose import JWTError, jwt
+
 from database import engine, SessionLocal
 from models import ContactMessage
 
@@ -45,6 +45,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="admin/login")
 
 
 def create_token(data: dict):
+
     to_encode = data.copy()
 
     expire = datetime.utcnow() + timedelta(
@@ -53,7 +54,11 @@ def create_token(data: dict):
 
     to_encode.update({"exp": expire})
 
-    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return jwt.encode(
+        to_encode,
+        SECRET_KEY,
+        algorithm=ALGORITHM
+    )
 
 
 def verify_token(token: str = Depends(oauth2_scheme)):
@@ -72,7 +77,8 @@ def verify_token(token: str = Depends(oauth2_scheme)):
 
         return username
 
-    except:
+    except JWTError:
+
         raise HTTPException(
             status_code=401,
             detail="Invalid or expired token"
@@ -87,7 +93,7 @@ def root():
     return {"message": "Backend is running successfully"}
 
 
-# ------------------ CONTACT ------------------
+# ================== CONTACT ==================
 
 @app.post("/contact")
 async def contact(request: Request):
@@ -112,7 +118,7 @@ async def contact(request: Request):
     }
 
 
-# ------------------ ADMIN LOGIN ------------------
+# ================== ADMIN LOGIN ==================
 
 @app.post("/admin/login")
 def admin_login(data: dict):
@@ -134,7 +140,7 @@ def admin_login(data: dict):
     }
 
 
-# ------------------ ADMIN MESSAGES ------------------
+# ================== GET MESSAGES ==================
 
 @app.get("/admin/messages")
 def get_messages(user: str = Depends(verify_token)):
@@ -160,27 +166,13 @@ def get_messages(user: str = Depends(verify_token)):
     ]
 
 
-# ------------------ MARK READ ------------------
-
-def verify_token(request: Request):
-    auth = request.headers.get("Authorization")
-
-    if not auth or not auth.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Unauthorized")
-
-    token = auth.replace("Bearer ", "")
-
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        return payload
-    except JWTError:
-        raise HTTPException(status_code=401, detail="Invalid token")
-
+# ================== TOGGLE READ ==================
 
 @app.put("/admin/messages/{message_id}/toggle-read")
-def toggle_read(message_id: int, request: Request):
-
-    verify_token(request)
+def toggle_read(
+    message_id: int,
+    user: str = Depends(verify_token)
+):
 
     db = SessionLocal()
 
@@ -190,9 +182,11 @@ def toggle_read(message_id: int, request: Request):
 
     if not message:
         db.close()
-        raise HTTPException(status_code=404, detail="Message not found")
+        raise HTTPException(
+            status_code=404,
+            detail="Message not found"
+        )
 
-    # Toggle status
     message.is_read = not message.is_read
 
     db.commit()
@@ -205,12 +199,45 @@ def toggle_read(message_id: int, request: Request):
         "is_read": message.is_read
     }
 
-# ------------------ HEALTH ------------------
+
+# ================== DELETE MESSAGE ==================
+
+@app.delete("/admin/messages/{message_id}")
+def delete_message(
+    message_id: int,
+    user: str = Depends(verify_token)
+):
+
+    db = SessionLocal()
+
+    msg = db.query(ContactMessage)\
+        .filter(ContactMessage.id == message_id)\
+        .first()
+
+    if not msg:
+        db.close()
+        raise HTTPException(
+            status_code=404,
+            detail="Message not found"
+        )
+
+    db.delete(msg)
+    db.commit()
+    db.close()
+
+    return {
+        "status": "success",
+        "message": "Message deleted"
+    }
+
+
+# ================== HEALTH ==================
 
 @app.get("/health")
 def health():
 
     try:
+
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
 
@@ -226,32 +253,3 @@ def health():
             "database": "disconnected",
             "error": str(e)
         }
-
-@app.delete("/admin/messages/{message_id}")
-def delete_message(message_id: int, request: Request):
-
-    auth = request.headers.get("Authorization")
-
-    if not auth or not auth.startswith("Bearer "):
-        raise HTTPException(status_code=401)
-
-    token = auth.replace("Bearer ", "")
-
-    expire = admin_tokens.get(token)
-
-    if not expire or expire < datetime.utcnow():
-        raise HTTPException(status_code=401)
-
-    db = SessionLocal()
-
-    msg = db.query(ContactMessage).filter(ContactMessage.id == message_id).first()
-
-    if not msg:
-        db.close()
-        raise HTTPException(status_code=404)
-
-    db.delete(msg)
-    db.commit()
-    db.close()
-
-    return {"status": "deleted"}
