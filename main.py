@@ -5,7 +5,7 @@ from sqlalchemy import text
 from datetime import datetime, timedelta
 import os
 import jwt
-
+from jose import JWTError, jwt
 from database import engine, SessionLocal
 from models import ContactMessage
 
@@ -162,35 +162,48 @@ def get_messages(user: str = Depends(verify_token)):
 
 # ------------------ MARK READ ------------------
 
-@app.put("/admin/messages/{message_id}/read")
-def mark_read(
-    message_id: int,
-    user: str = Depends(verify_token)
-):
+def verify_token(request: Request):
+    auth = request.headers.get("Authorization")
+
+    if not auth or not auth.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    token = auth.replace("Bearer ", "")
+
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+
+@app.put("/admin/messages/{message_id}/toggle-read")
+def toggle_read(message_id: int, request: Request):
+
+    verify_token(request)
 
     db = SessionLocal()
 
-    msg = db.query(ContactMessage)\
+    message = db.query(ContactMessage)\
         .filter(ContactMessage.id == message_id)\
         .first()
 
-    if not msg:
+    if not message:
         db.close()
-        raise HTTPException(
-            status_code=404,
-            detail="Message not found"
-        )
+        raise HTTPException(status_code=404, detail="Message not found")
 
-    msg.is_read = True
+    # Toggle status
+    message.is_read = not message.is_read
 
     db.commit()
+    db.refresh(message)
     db.close()
 
     return {
         "status": "success",
-        "message": "Marked as read"
+        "id": message.id,
+        "is_read": message.is_read
     }
-
 
 # ------------------ HEALTH ------------------
 
