@@ -1,6 +1,7 @@
 from sqlalchemy import Column, Integer, String, Boolean, DateTime
 from database import Base
 from datetime import datetime
+from sqlalchemy.sql import func
 
 
 class ContactMessage(Base):
@@ -12,7 +13,7 @@ class ContactMessage(Base):
     message = Column(String, nullable=False)
 
     is_read = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
 class AdminActivity(Base):

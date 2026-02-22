@@ -10,6 +10,9 @@ from fastapi import Query
 
 from database import engine, SessionLocal
 from models import ContactMessage, AdminActivity
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 
 # ================== APP ==================
@@ -77,6 +80,40 @@ def verify_token(token: str = Depends(oauth2_scheme)):
         )
 
 
+def send_email(name, email, message):
+
+    EMAIL_USER = os.environ.get("EMAIL_USER")
+    EMAIL_PASS = os.environ.get("EMAIL_PASS")
+
+    if not EMAIL_USER or not EMAIL_PASS:
+        return
+
+    subject = "New Portfolio Contact Message"
+
+    body = f"""
+New message received:
+
+Name: {name}
+Email: {email}
+
+Message:
+{message}
+"""
+
+    msg = MIMEMultipart()
+    msg["From"] = EMAIL_USER
+    msg["To"] = EMAIL_USER
+    msg["Subject"] = subject
+
+    msg.attach(MIMEText(body, "plain"))
+
+    server = smtplib.SMTP("smtp.gmail.com", 587)
+    server.starttls()
+    server.login(EMAIL_USER, EMAIL_PASS)
+    server.send_message(msg)
+    server.quit()
+
+
 # ================== ACTIVITY LOGGER ==================
 
 def log_admin_action(username: str, action: str):
@@ -118,6 +155,11 @@ async def contact(request: Request):
     db.commit()
     db.close()
 
+    send_email(
+        data.get("name"),
+        data.get("email"),
+        data.get("message")
+    )
     return {
         "status": "success",
         "message": "Your message has been sent"
