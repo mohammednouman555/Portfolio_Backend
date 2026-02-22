@@ -6,10 +6,9 @@ from datetime import datetime, timedelta
 import os
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-
 from database import engine, SessionLocal
 from models import ContactMessage
-
+from fastapi import Query
 
 # ================== APP ==================
 
@@ -160,28 +159,52 @@ def admin_login(data: dict):
 
 # ================== GET MESSAGES ==================
 
+from fastapi import Query
+
 @app.get("/admin/messages")
-def get_messages(user: str = Depends(verify_token)):
+def get_messages(
+    user: str = Depends(verify_token),
+    page: int = Query(1, ge=1),
+    limit: int = Query(5, ge=1, le=50),
+    search: str = Query(None)
+):
 
     db = SessionLocal()
 
-    messages = db.query(ContactMessage)\
-        .order_by(ContactMessage.created_at.desc())\
+    query = db.query(ContactMessage)
+
+    if search:
+        query = query.filter(
+            (ContactMessage.name.ilike(f"%{search}%")) |
+            (ContactMessage.email.ilike(f"%{search}%"))
+        )
+
+    total = query.count()
+
+    messages = query \
+        .order_by(ContactMessage.created_at.desc()) \
+        .offset((page - 1) * limit) \
+        .limit(limit) \
         .all()
 
     db.close()
 
-    return [
-        {
-            "id": m.id,
-            "name": m.name,
-            "email": m.email,
-            "message": m.message,
-            "is_read": m.is_read,
-            "created_at": m.created_at
-        }
-        for m in messages
-    ]
+    return {
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "messages": [
+            {
+                "id": m.id,
+                "name": m.name,
+                "email": m.email,
+                "message": m.message,
+                "is_read": m.is_read,
+                "created_at": m.created_at
+            }
+            for m in messages
+        ]
+    }
 
 
 # ================== TOGGLE READ ==================
