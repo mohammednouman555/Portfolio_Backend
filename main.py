@@ -37,7 +37,7 @@ ADMIN_PASS_HASH = os.environ.get("ADMIN_PASS_HASH")
 SECRET_KEY = os.environ.get("SECRET_KEY", "change-this-secret")
 
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60
+ACCESS_TOKEN_EXPIRE_MINUTES = 1
 
 
 # ================== PASSWORD HASHING ==================
