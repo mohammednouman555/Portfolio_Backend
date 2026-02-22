@@ -326,3 +326,12 @@ def health():
             "database": "disconnected",
             "error": str(e)
         }
+
+
+@app.get("/debug/email")
+def debug_email():
+    return {
+        "email_user": os.environ.get("EMAIL_USER"),
+        "email_pass": "SET" if
+        os.environ.get("EMAIL_PASS") else None
+    }
