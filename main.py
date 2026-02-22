@@ -6,9 +6,11 @@ from datetime import datetime, timedelta
 import os
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from database import engine, SessionLocal
-from models import ContactMessage
 from fastapi import Query
+
+from database import engine, SessionLocal
+from models import ContactMessage, AdminActivity
+
 
 # ================== APP ==================
 
@@ -44,41 +46,23 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 30
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
 
-def verify_password(plain_password: str, hashed_password: str):
-    return pwd_context.verify(plain_password, hashed_password)
-
-
 # ================== AUTH ==================
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="admin/login")
 
 
 def create_token(data: dict):
-
     to_encode = data.copy()
-
-    expire = datetime.utcnow() + timedelta(
-        minutes=ACCESS_TOKEN_EXPIRE_MINUTES
-    )
-
+    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
 
-    return jwt.encode(
-        to_encode,
-        SECRET_KEY,
-        algorithm=ALGORITHM
-    )
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 
 def verify_token(token: str = Depends(oauth2_scheme)):
 
     try:
-        payload = jwt.decode(
-            token,
-            SECRET_KEY,
-            algorithms=[ALGORITHM]
-        )
-
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username = payload.get("sub")
 
         if username is None:
@@ -93,8 +77,22 @@ def verify_token(token: str = Depends(oauth2_scheme)):
         )
 
 
-# ================== ROUTES ==================
+# ================== ACTIVITY LOGGER ==================
 
+def log_admin_action(username: str, action: str):
+    db = SessionLocal()
+
+    log = AdminActivity(
+        username=username,
+        action=action
+    )
+
+    db.add(log)
+    db.commit()
+    db.close()
+
+
+# ================== ROUTES ==================
 
 @app.get("/")
 def root():
@@ -134,22 +132,16 @@ def admin_login(data: dict):
     username = data.get("username")
     password = data.get("password")
 
-    # Check username
     if username != ADMIN_USER:
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid credentials"
-        )
+        raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    # Check password using hash
     if not pwd_context.verify(password, ADMIN_PASS_HASH):
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid credentials"
-        )
+        raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    # Create JWT token
     token = create_token({"sub": username})
+
+    # LOG LOGIN
+    log_admin_action(username, "Admin logged in")
 
     return {
         "access_token": token,
@@ -158,8 +150,6 @@ def admin_login(data: dict):
 
 
 # ================== GET MESSAGES ==================
-
-from fastapi import Query
 
 @app.get("/admin/messages")
 def get_messages(
@@ -215,17 +205,11 @@ def admin_stats(user: str = Depends(verify_token)):
     db = SessionLocal()
 
     total = db.query(ContactMessage).count()
+    read = db.query(ContactMessage).filter(ContactMessage.is_read == True).count()
+    unread = db.query(ContactMessage).filter(ContactMessage.is_read == False).count()
 
-    read = db.query(ContactMessage)\
-        .filter(ContactMessage.is_read == True)\
-        .count()
-
-    unread = db.query(ContactMessage)\
-        .filter(ContactMessage.is_read == False)\
-        .count()
-
-    last = db.query(ContactMessage)\
-        .order_by(ContactMessage.created_at.desc())\
+    last = db.query(ContactMessage) \
+        .order_by(ContactMessage.created_at.desc()) \
         .first()
 
     db.close()
@@ -241,29 +225,26 @@ def admin_stats(user: str = Depends(verify_token)):
 # ================== TOGGLE READ ==================
 
 @app.put("/admin/messages/{message_id}/toggle-read")
-def toggle_read(
-    message_id: int,
-    user: str = Depends(verify_token)
-):
+def toggle_read(message_id: int, user: str = Depends(verify_token)):
 
     db = SessionLocal()
 
-    message = db.query(ContactMessage)\
-        .filter(ContactMessage.id == message_id)\
+    message = db.query(ContactMessage) \
+        .filter(ContactMessage.id == message_id) \
         .first()
 
     if not message:
         db.close()
-        raise HTTPException(
-            status_code=404,
-            detail="Message not found"
-        )
+        raise HTTPException(status_code=404, detail="Message not found")
 
     message.is_read = not message.is_read
 
     db.commit()
     db.refresh(message)
     db.close()
+
+    # LOG ACTION
+    log_admin_action(user, f"Toggled read for message {message_id}")
 
     return {
         "status": "success",
@@ -275,32 +256,54 @@ def toggle_read(
 # ================== DELETE MESSAGE ==================
 
 @app.delete("/admin/messages/{message_id}")
-def delete_message(
-    message_id: int,
-    user: str = Depends(verify_token)
-):
+def delete_message(message_id: int, user: str = Depends(verify_token)):
 
     db = SessionLocal()
 
-    msg = db.query(ContactMessage)\
-        .filter(ContactMessage.id == message_id)\
+    msg = db.query(ContactMessage) \
+        .filter(ContactMessage.id == message_id) \
         .first()
 
     if not msg:
         db.close()
-        raise HTTPException(
-            status_code=404,
-            detail="Message not found"
-        )
+        raise HTTPException(status_code=404, detail="Message not found")
 
     db.delete(msg)
     db.commit()
     db.close()
 
+    # LOG ACTION
+    log_admin_action(user, f"Deleted message {message_id}")
+
     return {
         "status": "success",
         "message": "Message deleted"
     }
+
+
+# ================== GET ACTIVITY ==================
+
+@app.get("/admin/activity")
+def get_activity(user: str = Depends(verify_token)):
+
+    db = SessionLocal()
+
+    logs = db.query(AdminActivity) \
+        .order_by(AdminActivity.created_at.desc()) \
+        .limit(20) \
+        .all()
+
+    db.close()
+
+    return [
+        {
+            "id": log.id,
+            "username": log.username,
+            "action": log.action,
+            "created_at": log.created_at
+        }
+        for log in logs
+    ]
 
 
 # ================== HEALTH ==================
