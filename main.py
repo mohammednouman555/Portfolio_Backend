@@ -207,6 +207,37 @@ def get_messages(
     }
 
 
+# ================== ADMIN STATS ==================
+
+@app.get("/admin/stats")
+def admin_stats(user: str = Depends(verify_token)):
+
+    db = SessionLocal()
+
+    total = db.query(ContactMessage).count()
+
+    read = db.query(ContactMessage)\
+        .filter(ContactMessage.is_read == True)\
+        .count()
+
+    unread = db.query(ContactMessage)\
+        .filter(ContactMessage.is_read == False)\
+        .count()
+
+    last = db.query(ContactMessage)\
+        .order_by(ContactMessage.created_at.desc())\
+        .first()
+
+    db.close()
+
+    return {
+        "total_messages": total,
+        "read_messages": read,
+        "unread_messages": unread,
+        "last_message_time": last.created_at if last else None
+    }
+
+
 # ================== TOGGLE READ ==================
 
 @app.put("/admin/messages/{message_id}/toggle-read")
