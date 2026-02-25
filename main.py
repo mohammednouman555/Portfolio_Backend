@@ -13,6 +13,7 @@ from models import ContactMessage, AdminActivity
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from fastapi import BackgroundTasks
 
 
 # ================== APP ==================
@@ -88,9 +89,10 @@ def send_email(name, email, message):
     if not EMAIL_USER or not EMAIL_PASS:
         return
 
-    subject = "New Portfolio Contact Message"
+    try:
+        subject = "New Portfolio Contact Message"
 
-    body = f"""
+        body = f"""
 New message received:
 
 Name: {name}
@@ -100,18 +102,20 @@ Message:
 {message}
 """
 
-    msg = MIMEMultipart()
-    msg["From"] = EMAIL_USER
-    msg["To"] = EMAIL_USER
-    msg["Subject"] = subject
+        msg = MIMEMultipart()
+        msg["From"] = EMAIL_USER
+        msg["To"] = EMAIL_USER
+        msg["Subject"] = subject
+        msg.attach(MIMEText(body, "plain"))
 
-    msg.attach(MIMEText(body, "plain"))
+        server = smtplib.SMTP("smtp.gmail.com", 587, timeout=10)
+        server.starttls()
+        server.login(EMAIL_USER, EMAIL_PASS)
+        server.send_message(msg)
+        server.quit()
 
-    server = smtplib.SMTP("smtp.gmail.com", 587)
-    server.starttls()
-    server.login(EMAIL_USER, EMAIL_PASS)
-    server.send_message(msg)
-    server.quit()
+    except Exception as e:
+        print("Email error:", e)
 
 
 # ================== ACTIVITY LOGGER ==================
@@ -139,7 +143,10 @@ def root():
 # ================== CONTACT ==================
 
 @app.post("/contact")
-async def contact(request: Request):
+async def contact(
+    request: Request,
+    background_tasks: BackgroundTasks
+):
 
     data = await request.json()
 
@@ -155,16 +162,18 @@ async def contact(request: Request):
     db.commit()
     db.close()
 
-    send_email(
+    # run email in background
+    background_tasks.add_task(
+        send_email,
         data.get("name"),
         data.get("email"),
         data.get("message")
     )
+
     return {
         "status": "success",
         "message": "Your message has been sent"
     }
-
 
 # ================== ADMIN LOGIN ==================
 
