@@ -7,13 +7,13 @@ import os
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from fastapi import Query
-
 from database import engine, SessionLocal
 from models import ContactMessage, AdminActivity
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from fastapi import BackgroundTasks
+from sqlalchemy import inspect
 
 
 # ================== APP ==================
@@ -379,10 +379,8 @@ def health():
         }
 
 
-@app.get("/debug/email")
-def debug_email():
-    return {
-        "email_user": os.environ.get("EMAIL_USER"),
-        "email_pass": "SET" if
-        os.environ.get("EMAIL_PASS") else None
-    }
+@app.get("/debug/schema")
+def debug_schema():
+    inspector = inspect(engine)
+    columns = inspector.get_columns("contact_messages")
+    return columns
