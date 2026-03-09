@@ -14,6 +14,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from fastapi import BackgroundTasks
 from sqlalchemy import inspect
+from sqlalchemy import text
 
 
 # ================== APP ==================
@@ -394,3 +395,18 @@ def debug_schema():
         })
 
     return result
+
+
+@app.get("/debug/fix-created-at")
+def fix_created_at():
+    db = SessionLocal()
+
+    db.execute(text("""
+        ALTER TABLE contact_messages
+        ALTER COLUMN created_at SET DEFAULT NOW();
+    """))
+
+    db.commit()
+    db.close()
+
+    return {"status": "created_at default fixed"}
