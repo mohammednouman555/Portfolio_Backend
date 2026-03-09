@@ -383,4 +383,14 @@ def health():
 def debug_schema():
     inspector = inspect(engine)
     columns = inspector.get_columns("contact_messages")
-    return columns
+
+    result = []
+    for col in columns:
+        result.append({
+            "name": col["name"],
+            "type": str(col["type"]),
+            "default": str(col.get("default")),
+            "nullable": col.get("nullable")
+        })
+
+    return result
