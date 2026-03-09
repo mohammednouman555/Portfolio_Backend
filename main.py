@@ -410,3 +410,19 @@ def fix_created_at():
     db.close()
 
     return {"status": "created_at default fixed"}
+
+
+@app.get("/debug/fill-old-times")
+def fill_old_times():
+    db = SessionLocal()
+
+    db.execute(text("""
+        UPDATE contact_messages
+        SET created_at = NOW()
+        WHERE created_at IS NULL;
+    """))
+
+    db.commit()
+    db.close()
+
+    return {"status": "old messages fixed"}
