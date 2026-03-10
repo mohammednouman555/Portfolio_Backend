@@ -7,6 +7,7 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from fastapi import Query
 import os
+import requests
 
 from database import engine, SessionLocal
 from models import ContactMessage, AdminActivity
@@ -36,6 +37,7 @@ app.add_middleware(
 ADMIN_USER = os.environ.get("ADMIN_USER")
 ADMIN_PASS_HASH = os.environ.get("ADMIN_PASS_HASH")
 SECRET_KEY = os.environ.get("SECRET_KEY", "change-this-secret")
+SENDGRID_API_KEY = os.environ.get("SENDGRID_API_KEY")
 
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
@@ -93,6 +95,55 @@ def verify_token(token: str = Depends(oauth2_scheme)):
         )
 
 
+# ================== SEND EMAIL ==================
+
+def send_email(name: str, email: str, message: str):
+
+    if not SENDGRID_API_KEY:
+        print("SendGrid API key missing")
+        return
+
+    url = "https://api.sendgrid.com/v3/mail/send"
+
+    headers = {
+        "Authorization": f"Bearer {SENDGRID_API_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    data = {
+        "personalizations": [
+            {
+                "to": [{"email": "mohammednouman555@gmail.com"}],
+                "subject": "New Portfolio Contact Message"
+            }
+        ],
+        "from": {"email": "mohammednouman555@gmail.com"},
+        "content": [
+            {
+                "type": "text/plain",
+                "value": f"""
+New message received from portfolio:
+
+Name: {name}
+Email: {email}
+
+Message:
+{message}
+"""
+            }
+        ]
+    }
+
+    try:
+        response = requests.post(url, headers=headers, json=data)
+
+        if response.status_code not in [200, 202]:
+            print("SendGrid error:", response.text)
+
+    except Exception as e:
+        print("Email sending failed:", e)
+
+
 # ================== ACTIVITY LOGGER ==================
 
 def log_admin_action(username: str, action: str):
@@ -137,6 +188,14 @@ async def contact(
     db.add(new_message)
     db.commit()
     db.close()
+
+    # send email in background
+    background_tasks.add_task(
+        send_email,
+        data.get("name"),
+        data.get("email"),
+        data.get("message")
+    )
 
     return {
         "status": "success",
@@ -245,94 +304,6 @@ def admin_stats(user: str = Depends(verify_token)):
         "unread_messages": unread,
         "last_message_time": last.created_at if last else None
     }
-
-
-# ================== TOGGLE READ ==================
-
-@app.put("/admin/messages/{message_id}/toggle-read")
-def toggle_read(
-    message_id: int,
-    user: str = Depends(verify_token)
-):
-
-    db = SessionLocal()
-
-    message = db.query(ContactMessage)\
-        .filter(ContactMessage.id == message_id)\
-        .first()
-
-    if not message:
-        db.close()
-        raise HTTPException(status_code=404, detail="Message not found")
-
-    message.is_read = not message.is_read
-
-    db.commit()
-    db.refresh(message)
-    db.close()
-
-    log_admin_action(user, f"Toggled read for message {message_id}")
-
-    return {
-        "status": "success",
-        "id": message.id,
-        "is_read": message.is_read
-    }
-
-
-# ================== DELETE MESSAGE ==================
-
-@app.delete("/admin/messages/{message_id}")
-def delete_message(
-    message_id: int,
-    user: str = Depends(verify_token)
-):
-
-    db = SessionLocal()
-
-    msg = db.query(ContactMessage)\
-        .filter(ContactMessage.id == message_id)\
-        .first()
-
-    if not msg:
-        db.close()
-        raise HTTPException(status_code=404, detail="Message not found")
-
-    db.delete(msg)
-    db.commit()
-    db.close()
-
-    log_admin_action(user, f"Deleted message {message_id}")
-
-    return {
-        "status": "success",
-        "message": "Message deleted"
-    }
-
-
-# ================== ACTIVITY ==================
-
-@app.get("/admin/activity")
-def get_activity(user: str = Depends(verify_token)):
-
-    db = SessionLocal()
-
-    logs = db.query(AdminActivity)\
-        .order_by(AdminActivity.created_at.desc())\
-        .limit(20)\
-        .all()
-
-    db.close()
-
-    return [
-        {
-            "id": log.id,
-            "username": log.username,
-            "action": log.action,
-            "created_at": log.created_at
-        }
-        for log in logs
-    ]
 
 
 # ================== HEALTH ==================
