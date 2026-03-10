@@ -1,20 +1,15 @@
-from fastapi import FastAPI, Request, HTTPException, Depends
+from fastapi import FastAPI, Request, HTTPException, Depends, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy import text
 from datetime import datetime, timedelta
-import os
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from fastapi import Query
+import os
+
 from database import engine, SessionLocal
 from models import ContactMessage, AdminActivity
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from fastapi import BackgroundTasks
-from sqlalchemy import inspect
-from sqlalchemy import text
 
 
 # ================== APP ==================
@@ -57,17 +52,32 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="admin/login")
 
 
 def create_token(data: dict):
+
     to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+
+    expire = datetime.utcnow() + timedelta(
+        minutes=ACCESS_TOKEN_EXPIRE_MINUTES
+    )
+
     to_encode.update({"exp": expire})
 
-    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return jwt.encode(
+        to_encode,
+        SECRET_KEY,
+        algorithm=ALGORITHM
+    )
 
 
 def verify_token(token: str = Depends(oauth2_scheme)):
 
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+
+        payload = jwt.decode(
+            token,
+            SECRET_KEY,
+            algorithms=[ALGORITHM]
+        )
+
         username = payload.get("sub")
 
         if username is None:
@@ -76,52 +86,17 @@ def verify_token(token: str = Depends(oauth2_scheme)):
         return username
 
     except JWTError:
+
         raise HTTPException(
             status_code=401,
             detail="Invalid or expired token"
         )
 
 
-def send_email(name, email, message):
-
-    EMAIL_USER = os.environ.get("EMAIL_USER")
-    EMAIL_PASS = os.environ.get("EMAIL_PASS")
-
-    if not EMAIL_USER or not EMAIL_PASS:
-        return
-
-    try:
-        subject = "New Portfolio Contact Message"
-
-        body = f"""
-New message received:
-
-Name: {name}
-Email: {email}
-
-Message:
-{message}
-"""
-
-        msg = MIMEMultipart()
-        msg["From"] = EMAIL_USER
-        msg["To"] = EMAIL_USER
-        msg["Subject"] = subject
-        msg.attach(MIMEText(body, "plain"))
-
-        server = smtplib.SMTP("smtp.gmail.com", 587, timeout=10)
-        server.starttls()
-        server.login(EMAIL_USER, EMAIL_PASS)
-        server.send_message(msg)
-        server.quit()
-
-    except Exception as e:
-        print("Email error:", e)
-
-
 # ================== ACTIVITY LOGGER ==================
 
 def log_admin_action(username: str, action: str):
+
     db = SessionLocal()
 
     log = AdminActivity(
@@ -163,18 +138,11 @@ async def contact(
     db.commit()
     db.close()
 
-    # run email in background
-    background_tasks.add_task(
-        send_email,
-        data.get("name"),
-        data.get("email"),
-        data.get("message")
-    )
-
     return {
         "status": "success",
         "message": "Your message has been sent"
     }
+
 
 # ================== ADMIN LOGIN ==================
 
@@ -192,7 +160,6 @@ def admin_login(data: dict):
 
     token = create_token({"sub": username})
 
-    # LOG LOGIN
     log_admin_action(username, "Admin logged in")
 
     return {
@@ -257,11 +224,17 @@ def admin_stats(user: str = Depends(verify_token)):
     db = SessionLocal()
 
     total = db.query(ContactMessage).count()
-    read = db.query(ContactMessage).filter(ContactMessage.is_read == True).count()
-    unread = db.query(ContactMessage).filter(ContactMessage.is_read == False).count()
 
-    last = db.query(ContactMessage) \
-        .order_by(ContactMessage.created_at.desc()) \
+    read = db.query(ContactMessage)\
+        .filter(ContactMessage.is_read == True)\
+        .count()
+
+    unread = db.query(ContactMessage)\
+        .filter(ContactMessage.is_read == False)\
+        .count()
+
+    last = db.query(ContactMessage)\
+        .order_by(ContactMessage.created_at.desc())\
         .first()
 
     db.close()
@@ -277,12 +250,15 @@ def admin_stats(user: str = Depends(verify_token)):
 # ================== TOGGLE READ ==================
 
 @app.put("/admin/messages/{message_id}/toggle-read")
-def toggle_read(message_id: int, user: str = Depends(verify_token)):
+def toggle_read(
+    message_id: int,
+    user: str = Depends(verify_token)
+):
 
     db = SessionLocal()
 
-    message = db.query(ContactMessage) \
-        .filter(ContactMessage.id == message_id) \
+    message = db.query(ContactMessage)\
+        .filter(ContactMessage.id == message_id)\
         .first()
 
     if not message:
@@ -295,7 +271,6 @@ def toggle_read(message_id: int, user: str = Depends(verify_token)):
     db.refresh(message)
     db.close()
 
-    # LOG ACTION
     log_admin_action(user, f"Toggled read for message {message_id}")
 
     return {
@@ -308,12 +283,15 @@ def toggle_read(message_id: int, user: str = Depends(verify_token)):
 # ================== DELETE MESSAGE ==================
 
 @app.delete("/admin/messages/{message_id}")
-def delete_message(message_id: int, user: str = Depends(verify_token)):
+def delete_message(
+    message_id: int,
+    user: str = Depends(verify_token)
+):
 
     db = SessionLocal()
 
-    msg = db.query(ContactMessage) \
-        .filter(ContactMessage.id == message_id) \
+    msg = db.query(ContactMessage)\
+        .filter(ContactMessage.id == message_id)\
         .first()
 
     if not msg:
@@ -324,7 +302,6 @@ def delete_message(message_id: int, user: str = Depends(verify_token)):
     db.commit()
     db.close()
 
-    # LOG ACTION
     log_admin_action(user, f"Deleted message {message_id}")
 
     return {
@@ -333,16 +310,16 @@ def delete_message(message_id: int, user: str = Depends(verify_token)):
     }
 
 
-# ================== GET ACTIVITY ==================
+# ================== ACTIVITY ==================
 
 @app.get("/admin/activity")
 def get_activity(user: str = Depends(verify_token)):
 
     db = SessionLocal()
 
-    logs = db.query(AdminActivity) \
-        .order_by(AdminActivity.created_at.desc()) \
-        .limit(20) \
+    logs = db.query(AdminActivity)\
+        .order_by(AdminActivity.created_at.desc())\
+        .limit(20)\
         .all()
 
     db.close()
@@ -364,6 +341,7 @@ def get_activity(user: str = Depends(verify_token)):
 def health():
 
     try:
+
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
 
@@ -373,56 +351,9 @@ def health():
         }
 
     except Exception as e:
+
         return {
             "status": "degraded",
             "database": "disconnected",
             "error": str(e)
         }
-
-
-@app.get("/debug/schema")
-def debug_schema():
-    inspector = inspect(engine)
-    columns = inspector.get_columns("contact_messages")
-
-    result = []
-    for col in columns:
-        result.append({
-            "name": col["name"],
-            "type": str(col["type"]),
-            "default": str(col.get("default")),
-            "nullable": col.get("nullable")
-        })
-
-    return result
-
-
-@app.get("/debug/fix-created-at")
-def fix_created_at():
-    db = SessionLocal()
-
-    db.execute(text("""
-        ALTER TABLE contact_messages
-        ALTER COLUMN created_at SET DEFAULT NOW();
-    """))
-
-    db.commit()
-    db.close()
-
-    return {"status": "created_at default fixed"}
-
-
-@app.get("/debug/fill-old-times")
-def fill_old_times():
-    db = SessionLocal()
-
-    db.execute(text("""
-        UPDATE contact_messages
-        SET created_at = NOW()
-        WHERE created_at IS NULL;
-    """))
-
-    db.commit()
-    db.close()
-
-    return {"status": "old messages fixed"}

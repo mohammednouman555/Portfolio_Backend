@@ -8,3 +8,4 @@ alembic
 PyJWT
 python-jose
 passlib
+requests
