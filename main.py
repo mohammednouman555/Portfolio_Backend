@@ -117,7 +117,13 @@ def send_email(name: str, email: str, message: str):
                 "subject": "New Portfolio Contact Message"
             }
         ],
-        "from": {"email": "mohammednouman555@gmail.com"},
+        "from": {
+            "email": "mohammednouman555@gmail.com",
+            "name": "Portfolio Contact"
+        },
+        "reply_to": {
+            "email": email
+        },
         "content": [
             {
                 "type": "text/plain",
@@ -137,12 +143,11 @@ Message:
     try:
         response = requests.post(url, headers=headers, json=data)
 
-        if response.status_code not in [200, 202]:
-            print("SendGrid error:", response.text)
+        print("SendGrid Status:", response.status_code)
+        print("SendGrid Response:", response.text)
 
     except Exception as e:
         print("Email sending failed:", e)
-
 
 # ================== ACTIVITY LOGGER ==================
 
