@@ -99,58 +99,43 @@ def verify_token(token: str = Depends(oauth2_scheme)):
 
 # ================== SEND EMAIL ==================
 
-def send_email(name: str, email: str, message: str):
+import smtplib
+from email.mime.text import MIMEText
 
-    if not SENDGRID_API_KEY:
-        print("SendGrid API key missing")
+def send_email(name, email, message):
+
+    EMAIL_USER = os.environ.get("EMAIL_USER")
+    EMAIL_PASS = os.environ.get("EMAIL_PASS")
+
+    if not EMAIL_USER or not EMAIL_PASS:
+        print("Email config missing")
         return
 
-    url = "https://api.sendgrid.com/v3/mail/send"
-
-    headers = {
-        "Authorization": f"Bearer {SENDGRID_API_KEY}",
-        "Content-Type": "application/json"
-    }
-
-    data = {
-        "personalizations": [
-            {
-                "to": [{"email": "mohammednouman555@gmail.com"}],
-                "subject": "New Portfolio Contact Message"
-            }
-        ],
-        "from": {
-            "email": "mohammednouman555@gmail.com",
-            "name": "Portfolio Contact"
-        },
-        "reply_to": {
-            "email": email
-        },
-        "content": [
-            {
-                "type": "text/plain",
-                "value": f"""
-New message received from portfolio:
+    try:
+        msg = MIMEText(f"""
+New message from portfolio:
 
 Name: {name}
 Email: {email}
 
 Message:
 {message}
-"""
-            }
-        ]
-    }
+""")
 
-    try:
-        response = requests.post(url, headers=headers, json=data)
+        msg["Subject"] = "New Portfolio Message"
+        msg["From"] = EMAIL_USER
+        msg["To"] = EMAIL_USER
 
-        print("SendGrid Status:", response.status_code)
-        print("SendGrid Response:", response.text)
+        server = smtplib.SMTP("smtp.gmail.com", 587)
+        server.starttls()
+        server.login(EMAIL_USER, EMAIL_PASS)
+        server.send_message(msg)
+        server.quit()
+
+        print("✅ Email sent successfully")
 
     except Exception as e:
-        print("Email sending failed:", e)
-
+        print("❌ Email error:", e)
 # ================== ACTIVITY LOGGER ==================
 
 def log_admin_action(username: str, action: str):
