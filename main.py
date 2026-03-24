@@ -17,9 +17,6 @@ from models import Base, ContactMessage, AdminActivity
 app = FastAPI()
 
 
-Base.metadata.create_all(bind=engine)
-
-
 # ================== CORS ==================
 
 app.add_middleware(
@@ -107,8 +104,11 @@ def send_email(name, email, message):
     EMAIL_USER = os.environ.get("EMAIL_USER")
     EMAIL_PASS = os.environ.get("EMAIL_PASS")
 
+    print("EMAIL_USER:", EMAIL_USER)
+    print("EMAIL_PASS exists:", "YES" if EMAIL_PASS else "NO")
+
     if not EMAIL_USER or not EMAIL_PASS:
-        print("Email config missing")
+        print("❌ Email config missing")
         return
 
     try:
@@ -126,9 +126,17 @@ Message:
         msg["From"] = EMAIL_USER
         msg["To"] = EMAIL_USER
 
-        server = smtplib.SMTP("smtp.gmail.com", 587)
+        print("Connecting to SMTP...")
+
+        server = smtplib.SMTP("smtp.gmail.com", 587, timeout=10)
         server.starttls()
+
+        print("Logging in...")
+
         server.login(EMAIL_USER, EMAIL_PASS)
+
+        print("Sending email...")
+
         server.send_message(msg)
         server.quit()
 
@@ -136,6 +144,8 @@ Message:
 
     except Exception as e:
         print("❌ Email error:", e)
+
+
 # ================== ACTIVITY LOGGER ==================
 
 def log_admin_action(username: str, action: str):
