@@ -8,14 +8,16 @@ from passlib.context import CryptContext
 from fastapi import Query
 import os
 import requests
-
 from database import engine, SessionLocal
-from models import ContactMessage, AdminActivity
+from models import Base, ContactMessage, AdminActivity
 
 
 # ================== APP ==================
 
 app = FastAPI()
+
+
+Base.metadata.create_all(bind=engine)
 
 
 # ================== CORS ==================
