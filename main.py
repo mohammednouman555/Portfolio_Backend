@@ -99,7 +99,7 @@ def verify_token(token: str = Depends(oauth2_scheme)):
 import requests
 import os
 
-def send_email(name, email, message):
+def send_email(name: str, email: str, message: str):
 
     API_KEY = os.environ.get("RESEND_API_KEY")
 
@@ -114,30 +114,62 @@ def send_email(name, email, message):
         "Content-Type": "application/json"
     }
 
-    data = {
-        "from": "onboarding@resend.dev",
+    # ================== EMAIL TO YOU ==================
+
+    admin_html = f"""
+    <h2>📩 New Portfolio Message</h2>
+    <p><strong>Name:</strong> {name}</p>
+    <p><strong>Email:</strong> {email}</p>
+    <p><strong>Message:</strong></p>
+    <div style="background:#f4f4f4;padding:10px;border-radius:5px;">
+        {message}
+    </div>
+    """
+
+    admin_data = {
+        "from": "Portfolio <onboarding@resend.dev>",
         "to": ["mohammednouman555@gmail.com"],
         "subject": "New Portfolio Message",
-        "text": f"""
-New message received:
+        "html": admin_html
+    }
 
-Name: {name}
-Email: {email}
+    # ================== AUTO REPLY TO USER ==================
 
-Message:
-{message}
-"""
+    user_html = f"""
+    <h2>Thank you, {name}!</h2>
+    <p>Your message has been received successfully.</p>
+
+    <p>I will get back to you soon.</p>
+
+    <hr>
+
+    <p><strong>Your Message:</strong></p>
+    <div style="background:#f9f9f9;padding:10px;border-radius:5px;">
+        {message}
+    </div>
+
+    <br>
+    <p>— Mohammed Nouman</p>
+    """
+
+    user_data = {
+        "from": "Mohammed Nouman <onboarding@resend.dev>",
+        "to": [email],
+        "subject": "We received your message",
+        "html": user_html
     }
 
     try:
-        response = requests.post(url, headers=headers, json=data)
+        # Send to admin
+        res1 = requests.post(url, headers=headers, json=admin_data)
+        print("📨 Admin mail:", res1.status_code)
 
-        print("📨 Resend status:", response.status_code)
-        print("📨 Resend response:", response.text)
+        # Send auto-reply
+        res2 = requests.post(url, headers=headers, json=user_data)
+        print("📨 User mail:", res2.status_code)
 
     except Exception as e:
-        print("❌ Resend error:", e)
-
+        print("❌ Email error:", e)
 
 # ================== ACTIVITY LOGGER ==================
 
