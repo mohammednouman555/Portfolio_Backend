@@ -96,54 +96,47 @@ def verify_token(token: str = Depends(oauth2_scheme)):
 
 # ================== SEND EMAIL ==================
 
-import smtplib
-from email.mime.text import MIMEText
+import requests
+import os
 
 def send_email(name, email, message):
 
-    EMAIL_USER = os.environ.get("EMAIL_USER")
-    EMAIL_PASS = os.environ.get("EMAIL_PASS")
+    API_KEY = os.environ.get("RESEND_API_KEY")
 
-    print("EMAIL_USER:", EMAIL_USER)
-    print("EMAIL_PASS exists:", "YES" if EMAIL_PASS else "NO")
-
-    if not EMAIL_USER or not EMAIL_PASS:
-        print("❌ Email config missing")
+    if not API_KEY:
+        print("❌ Resend API key missing")
         return
 
-    try:
-        msg = MIMEText(f"""
-New message from portfolio:
+    url = "https://api.resend.com/emails"
+
+    headers = {
+        "Authorization": f"Bearer {API_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    data = {
+        "from": "onboarding@resend.dev",
+        "to": ["mohammednouman555@gmail.com"],
+        "subject": "New Portfolio Message",
+        "text": f"""
+New message received:
 
 Name: {name}
 Email: {email}
 
 Message:
 {message}
-""")
+"""
+    }
 
-        msg["Subject"] = "New Portfolio Message"
-        msg["From"] = EMAIL_USER
-        msg["To"] = EMAIL_USER
+    try:
+        response = requests.post(url, headers=headers, json=data)
 
-        print("Connecting to SMTP...")
-
-        server = smtplib.SMTP("smtp.gmail.com", 587, timeout=10)
-        server.starttls()
-
-        print("Logging in...")
-
-        server.login(EMAIL_USER, EMAIL_PASS)
-
-        print("Sending email...")
-
-        server.send_message(msg)
-        server.quit()
-
-        print("✅ Email sent successfully")
+        print("📨 Resend status:", response.status_code)
+        print("📨 Resend response:", response.text)
 
     except Exception as e:
-        print("❌ Email error:", e)
+        print("❌ Resend error:", e)
 
 
 # ================== ACTIVITY LOGGER ==================
