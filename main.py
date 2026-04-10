@@ -3,68 +3,55 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy import text
 from datetime import datetime, timedelta
-from jose import JWTError, jwt
+from jose import jwt
 from passlib.context import CryptContext
-from fastapi import Query
 import os
 import smtplib
 from email.mime.text import MIMEText
 from fastapi.responses import StreamingResponse
-import io
-import csv
+import io, csv
 
 from database import engine, SessionLocal
-from models import Base, ContactMessage, AdminActivity
+from models import Base, ContactMessage
 
-# ================== APP ==================
+# ================= APP =================
 app = FastAPI()
-
-# ================== DB INIT ==================
 Base.metadata.create_all(bind=engine)
 
-# ================== CORS ==================
+# ================= CORS =================
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://mohammednouman555.github.io",
-        "http://localhost:63342"
-    ],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ================== ENV ==================
+# ================= AUTH =================
 ADMIN_USER = os.environ.get("ADMIN_USER")
 ADMIN_PASS_HASH = os.environ.get("ADMIN_PASS_HASH")
-SECRET_KEY = os.environ.get("SECRET_KEY", "change-this-secret")
+SECRET_KEY = os.environ.get("SECRET_KEY", "secret")
 
-ALGORITHM = "HS256"
-
-pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
+pwd_context = CryptContext(schemes=["pbkdf2_sha256"])
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="admin/login")
 
-# ================== TOKEN ==================
 def create_token(data: dict):
-    to_encode = data.copy()
-    to_encode.update({"exp": datetime.utcnow() + timedelta(minutes=30)})
-    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return jwt.encode(data, SECRET_KEY, algorithm="HS256")
 
 def verify_token(token: str = Depends(oauth2_scheme)):
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        return payload.get("sub")
+        return jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
     except:
         raise HTTPException(status_code=401)
 
-# ================== EMAIL ==================
+# ================= EMAIL =================
 def send_email(name, email, message):
     EMAIL_USER = os.environ.get("EMAIL_USER")
     EMAIL_PASS = os.environ.get("EMAIL_PASS")
 
     try:
         msg = MIMEText(f"{name}\n{email}\n\n{message}")
-        msg["Subject"] = "New Portfolio Message"
+        msg["Subject"] = "Portfolio Message"
         msg["From"] = EMAIL_USER
         msg["To"] = EMAIL_USER
 
@@ -76,18 +63,18 @@ def send_email(name, email, message):
     except Exception as e:
         print("Email error:", e)
 
-# ================== CONTACT ==================
+# ================= CONTACT =================
 @app.post("/contact")
 async def contact(request: Request, background_tasks: BackgroundTasks):
     data = await request.json()
-    db = SessionLocal()
 
+    db = SessionLocal()
     msg = ContactMessage(
         name=data["name"],
         email=data["email"],
-        message=data["message"]
+        message=data["message"],
+        created_at=datetime.utcnow()
     )
-
     db.add(msg)
     db.commit()
     db.close()
@@ -96,7 +83,7 @@ async def contact(request: Request, background_tasks: BackgroundTasks):
 
     return {"status": "success"}
 
-# ================== LOGIN ==================
+# ================= LOGIN =================
 @app.post("/admin/login")
 def login(data: dict):
     if data["username"] != ADMIN_USER:
@@ -107,67 +94,65 @@ def login(data: dict):
 
     return {"access_token": create_token({"sub": data["username"]})}
 
-# ================== GET MESSAGES ==================
+# ================= GET MESSAGES =================
 @app.get("/admin/messages")
-def get_messages(
-    user: str = Depends(verify_token),
-    page: int = 1,
-    limit: int = 5,
-    search: str = ""
-):
+def get_messages(user: dict = Depends(verify_token)):
     db = SessionLocal()
 
-    query = db.query(ContactMessage)
-
-    if search:
-        query = query.filter(
-            ContactMessage.name.ilike(f"%{search}%")
-        )
-
-    total = query.count()
-
-    messages = query.order_by(ContactMessage.created_at.desc())\
-        .offset((page-1)*limit)\
-        .limit(limit)\
+    msgs = db.query(ContactMessage)\
+        .order_by(ContactMessage.created_at.desc())\
         .all()
 
     db.close()
 
     return {
-        "total": total,
-        "messages": messages
+        "messages": [
+            {
+                "id": m.id,
+                "name": m.name,
+                "email": m.email,
+                "message": m.message,
+                "is_read": m.is_read,
+                "created_at": m.created_at
+            }
+            for m in msgs
+        ]
     }
 
-# ================== DELETE ==================
+# ================= DELETE =================
 @app.delete("/admin/messages/{id}")
-def delete_msg(id: int, user: str = Depends(verify_token)):
+def delete_msg(id: int, user: dict = Depends(verify_token)):
     db = SessionLocal()
-
     msg = db.query(ContactMessage).filter(ContactMessage.id == id).first()
-    db.delete(msg)
-    db.commit()
-    db.close()
 
+    if msg:
+        db.delete(msg)
+        db.commit()
+
+    db.close()
     return {"status": "deleted"}
 
-# ================== TOGGLE ==================
+# ================= TOGGLE =================
 @app.put("/admin/messages/{id}/toggle-read")
-def toggle(id: int, user: str = Depends(verify_token)):
+def toggle(id: int, user: dict = Depends(verify_token)):
     db = SessionLocal()
-    msg = db.query(ContactMessage).get(id)
-    msg.is_read = not msg.is_read
-    db.commit()
+    msg = db.query(ContactMessage).filter(ContactMessage.id == id).first()
+
+    if msg:
+        msg.is_read = not msg.is_read
+        db.commit()
+
     db.close()
     return {"status": "updated"}
 
-# ================== STATS ==================
+# ================= STATS =================
 @app.get("/admin/stats")
-def stats(user: str = Depends(verify_token)):
+def stats(user: dict = Depends(verify_token)):
     db = SessionLocal()
 
     total = db.query(ContactMessage).count()
-    read = db.query(ContactMessage).filter_by(is_read=True).count()
-    unread = db.query(ContactMessage).filter_by(is_read=False).count()
+    read = db.query(ContactMessage).filter(ContactMessage.is_read == True).count()
+    unread = db.query(ContactMessage).filter(ContactMessage.is_read == False).count()
     last = db.query(ContactMessage).order_by(ContactMessage.created_at.desc()).first()
 
     db.close()
@@ -179,31 +164,18 @@ def stats(user: str = Depends(verify_token)):
         "last_message_time": last.created_at if last else None
     }
 
-# ================== ACTIVITY ==================
-@app.get("/admin/activity")
-def activity(user: str = Depends(verify_token)):
-    db = SessionLocal()
-
-    logs = db.query(AdminActivity)\
-        .order_by(AdminActivity.created_at.desc())\
-        .limit(10).all()
-
-    db.close()
-    return logs
-
-# ================== EXPORT CSV ==================
+# ================= EXPORT =================
 @app.get("/admin/export")
-def export(user: str = Depends(verify_token)):
+def export(user: dict = Depends(verify_token)):
     db = SessionLocal()
-    messages = db.query(ContactMessage).all()
+    msgs = db.query(ContactMessage).all()
     db.close()
 
     output = io.StringIO()
     writer = csv.writer(output)
-
     writer.writerow(["Name","Email","Message","Date"])
 
-    for m in messages:
+    for m in msgs:
         writer.writerow([m.name, m.email, m.message, m.created_at])
 
     output.seek(0)
