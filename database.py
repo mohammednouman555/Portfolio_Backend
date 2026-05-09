@@ -6,9 +6,12 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 
 if DATABASE_URL:
 
-    # Fix postgres:// → postgresql://
+    # Render postgres fix
     if DATABASE_URL.startswith("postgres://"):
-        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://")
+        DATABASE_URL = DATABASE_URL.replace(
+            "postgres://",
+            "postgresql+psycopg2://"
+        )
 
     engine = create_engine(
         DATABASE_URL,
@@ -16,6 +19,8 @@ if DATABASE_URL:
     )
 
 else:
+
+    # Local SQLite fallback
     engine = create_engine(
         "sqlite:///./portfolio.db",
         connect_args={"check_same_thread": False}

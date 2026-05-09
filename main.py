@@ -15,8 +15,11 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from fastapi.responses import StreamingResponse
 
-from database import engine, SessionLocal
+from database import engine, SessionLocal, Base
 from models import ContactMessage, AdminActivity
+
+
+Base.metadata.create_all(bind=engine)
 
 
 # ================== APP ==================
@@ -25,6 +28,7 @@ app = FastAPI()
 
 
 # ================== CORS ==================
+
 
 app.add_middleware(
     CORSMiddleware,
