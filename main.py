@@ -10,7 +10,7 @@ import os
 import smtplib
 import csv
 import io
-
+import resend
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from fastapi.responses import StreamingResponse
@@ -86,58 +86,38 @@ def verify_token(token: str = Depends(oauth2_scheme)):
 
 # ================== EMAIL (PREMIUM HTML) ==================
 
+
+
+resend.api_key = os.environ.get("RESEND_API_KEY")
+
+
 def send_email(name, email, message):
-
-    EMAIL_USER = os.environ.get("EMAIL_USER")
-    EMAIL_PASS = os.environ.get("EMAIL_PASS")
-
-    if not EMAIL_USER or not EMAIL_PASS:
-        print("Email config missing")
-        return
 
     try:
 
-        html = f"""
-        <html>
-        <body style="font-family:Arial; background:#f4f6f9; padding:20px;">
-            <div style="max-width:600px; margin:auto; background:white; padding:20px; border-radius:10px;">
-                <h2 style="color:#0077b6;">📩 New Portfolio Message</h2>
+        params = {
+            "from": "onboarding@resend.dev",
+            "to": ["mohammednouman555@gmail.com"],
+            "subject": "New Portfolio Message",
+            "html": f"""
+                <h2>📩 New Portfolio Message</h2>
 
                 <p><b>Name:</b> {name}</p>
                 <p><b>Email:</b> {email}</p>
 
-                <div style="margin-top:15px; padding:15px; background:#f1f1f1; border-radius:8px;">
+                <div style='padding:15px;background:#f1f1f1;border-radius:8px;'>
                     {message}
                 </div>
+            """
+        }
 
-                <p style="margin-top:20px; font-size:12px; color:gray;">
-                    Sent from your portfolio website
-                </p>
-            </div>
-        </body>
-        </html>
-        """
-
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = "New Portfolio Message"
-        msg["From"] = EMAIL_USER
-        msg["To"] = EMAIL_USER
-
-        msg.attach(MIMEText(html, "html"))
-
-        server = smtplib.SMTP_SSL("smtp.gmail.com", 465)
-
-        server.login(EMAIL_USER, EMAIL_PASS)
-
-        server.send_message(msg)
-
-        server.quit()
+        resend.Emails.send(params)
 
         print("Email sent successfully")
 
     except Exception as e:
-        print("Email error:", e)
 
+        print("Email error:", e)
 
 # ================== ACTIVITY LOG ==================
 
