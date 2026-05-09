@@ -125,10 +125,12 @@ def send_email(name, email, message):
 
         msg.attach(MIMEText(html, "html"))
 
-        server = smtplib.SMTP("smtp.gmail.com", 587)
-        server.starttls()
+        server = smtplib.SMTP_SSL("smtp.gmail.com", 465)
+
         server.login(EMAIL_USER, EMAIL_PASS)
+
         server.send_message(msg)
+
         server.quit()
 
         print("Email sent successfully")
