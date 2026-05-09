@@ -164,7 +164,7 @@ def root():
 # ================== CONTACT ==================
 
 @app.post("/contact")
-async def contact(request: Request, background_tasks: BackgroundTasks):
+async def contact(request: Request):
 
     data = await request.json()
 
@@ -180,15 +180,17 @@ async def contact(request: Request, background_tasks: BackgroundTasks):
     db.commit()
     db.close()
 
-    # send email
-    background_tasks.add_task(
-        send_email,
+    # SEND EMAIL DIRECTLY
+    send_email(
         data.get("name"),
         data.get("email"),
         data.get("message")
     )
 
-    return {"status": "success", "message": "Message sent"}
+    return {
+        "status": "success",
+        "message": "Message sent"
+    }
 
 
 # ================== LOGIN ==================
