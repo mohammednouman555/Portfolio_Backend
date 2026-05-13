@@ -7,12 +7,12 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from fastapi import Query
 import os
-import smtplib
+# import smtplib
 import csv
 import io
 import resend
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+# from email.mime.text import MIMEText
+# from email.mime.multipart import MIMEMultipart
 from fastapi.responses import StreamingResponse
 
 from database import engine, SessionLocal, Base
@@ -84,40 +84,64 @@ def verify_token(token: str = Depends(oauth2_scheme)):
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
 
-# ================== EMAIL (PREMIUM HTML) ==================
+
+# ================== EMAIL ==================
 
 
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY")
 
-resend.api_key = os.environ.get("RESEND_API_KEY")
+resend.api_key = RESEND_API_KEY
 
 
 def send_email(name, email, message):
 
     try:
 
-        params = {
+        response = resend.Emails.send({
+
             "from": "onboarding@resend.dev",
-            "to": ["mohammednouman555@gmail.com"],
+
+            "to": "mohammednouman555@gmail.com",
+
             "subject": "New Portfolio Message",
+
             "html": f"""
-                <h2>📩 New Portfolio Message</h2>
+                <div style="
+                    font-family:Arial;
+                    padding:20px;
+                    background:#f4f4f4;
+                ">
 
-                <p><b>Name:</b> {name}</p>
-                <p><b>Email:</b> {email}</p>
+                    <h2 style="color:#0077b6;">
+                        📩 New Portfolio Message
+                    </h2>
 
-                <div style='padding:15px;background:#f1f1f1;border-radius:8px;'>
-                    {message}
+                    <p>
+                        <strong>Name:</strong> {name}
+                    </p>
+
+                    <p>
+                        <strong>Email:</strong> {email}
+                    </p>
+
+                    <div style="
+                        margin-top:15px;
+                        padding:15px;
+                        background:white;
+                        border-radius:8px;
+                    ">
+                        {message}
+                    </div>
+
                 </div>
             """
-        }
+        })
 
-        resend.Emails.send(params)
-
-        print("Email sent successfully")
+        print("Email response:", response)
 
     except Exception as e:
 
-        print("Email error:", e)
+        print("Resend Email Error:", e)
 
 # ================== ACTIVITY LOG ==================
 
@@ -144,7 +168,10 @@ def root():
 # ================== CONTACT ==================
 
 @app.post("/contact")
-async def contact(request: Request):
+async def contact(
+    request: Request,
+    background_tasks: BackgroundTasks
+):
 
     data = await request.json()
 
@@ -160,8 +187,9 @@ async def contact(request: Request):
     db.commit()
     db.close()
 
-    # SEND EMAIL DIRECTLY
-    send_email(
+    # Send email in background
+    background_tasks.add_task(
+        send_email,
         data.get("name"),
         data.get("email"),
         data.get("message")
