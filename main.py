@@ -142,6 +142,8 @@ def send_email(name, email, message):
 
     try:
 
+        print("RESEND KEY EXISTS:", bool(RESEND_API_KEY))
+
         response = resend.Emails.send({
 
             "from": "onboarding@resend.dev",
@@ -151,49 +153,25 @@ def send_email(name, email, message):
             "subject": "New Portfolio Message",
 
             "html": f"""
-                <div style="
-                    font-family:Arial;
-                    padding:20px;
-                    background:#f4f4f4;
-                ">
+                <h2>New Portfolio Message</h2>
 
-                    <h2 style="
-                        color:#0077b6;
-                    ">
-                        📩 New Portfolio Message
-                    </h2>
+                <p><strong>Name:</strong> {name}</p>
 
-                    <p>
-                        <strong>Name:</strong> {name}
-                    </p>
+                <p><strong>Email:</strong> {email}</p>
 
-                    <p>
-                        <strong>Email:</strong> {email}
-                    </p>
+                <p><strong>Message:</strong></p>
 
-                    <div style="
-                        margin-top:15px;
-                        padding:15px;
-                        background:white;
-                        border-radius:8px;
-                    ">
-                        {message}
-                    </div>
-
-                </div>
+                <div>{message}</div>
             """
         })
 
-        print("Email sent successfully")
-
+        print("FULL RESEND RESPONSE:")
         print(response)
 
     except Exception as e:
 
-        print("Resend Email Error:")
-
-        print(str(e))
-
+        print("FULL RESEND ERROR:")
+        print(repr(e))
 
 # ================== ACTIVITY LOG ==================
 
